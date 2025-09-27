@@ -1,8 +1,8 @@
 // webhook-server.js
 import express from 'express';
 import crypto from 'crypto';
-import FileProcessor from './file-processor.ts';
-import config from './config.ts';
+import FileProcessor from './file-processor';
+import config from './config';
 
 const app = express();
 app.use(express.json());

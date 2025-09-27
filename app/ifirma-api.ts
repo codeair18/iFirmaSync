@@ -1,7 +1,7 @@
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 // @ts-ignore
-import config from './config.ts';
+import config from './config';
 import util from 'util';
 
 interface InvoiceData {

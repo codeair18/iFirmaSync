@@ -9,7 +9,7 @@
     "clean": "rm -rf dist",
     "build:watch": "tsc --watch",
     "serve": "node dist/webhook-server.js",
-    "start": "ts-node webhook-server.ts",
+    "start": "tsx webhook-server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -34,17 +34,18 @@
     "googleapis": "^160.0.0",
     "multer": "^2.0.2",
     "path": "^0.12.7",
-    "pdf-parse": "^1.1.1",
+    "pdf-ts": "^0.0.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@tsconfig/node22": "^22.0.2",
     "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.5.2",
-    "@types/pdf-parse": "^1.1.5",
-    "ts-node": "^10.9.2",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.2"
   }
 }

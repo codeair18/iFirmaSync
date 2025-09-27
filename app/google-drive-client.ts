@@ -4,7 +4,7 @@ import { drive_v3 } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import fs from 'fs-extra';
 import path from 'path';
-import config from './config.ts';
+import config from './config';
 
 class GoogleDriveClient {
     private auth: GoogleAuth;

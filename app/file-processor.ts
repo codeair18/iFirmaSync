@@ -1,14 +1,14 @@
 // file-processor.ts
 import fs from 'fs-extra';
 import path from 'path';
-import pdf from 'pdf-parse';
+import { pdfToText } from 'pdf-ts';
 import * as xlsx from 'xlsx';
 import cryptoUtils from 'crypto';
 // @ts-ignore
-import GoogleDriveClient from './google-drive-client.ts';
-import iFirmaAPIClass from './ifirma-api.ts';
+import GoogleDriveClient from './google-drive-client';
+import iFirmaAPIClass from './ifirma-api';
 // @ts-ignore
-import fileConfig from './config.ts';
+import fileConfig from './config';
 
 interface DriveFile {
     id: string;
@@ -192,8 +192,7 @@ class FileProcessor {
     async extractFromPDF(filePath: string): Promise<InvoiceData | null> {
         try {
             const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await pdf(dataBuffer);
-            const text = pdfData.text;
+            const text = await pdfToText(dataBuffer);
 
             return this.parseInvoiceText(text);
         } catch (error: any) {
