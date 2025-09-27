@@ -1,5 +1,6 @@
 // config.js
-require('dotenv').config();
+import { config as dotenvConfig } from 'dotenv';
+dotenvConfig();
 
 const config = {
     googleDrive: {
@@ -25,4 +26,4 @@ const config = {
     logLevel: 'info'
 };
 
-module.exports = config;
+export default config;

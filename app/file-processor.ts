@@ -1,17 +1,57 @@
-// file-processor.js
-const fs = require('fs-extra');
-const path = require('path');
-const pdf = require('pdf-parse');
-const xlsx = require('xlsx');
-const crypto = require('crypto');
-const GoogleDriveClient = require('./google-drive-client');
-const iFirmaAPI = require('./ifirma-api');
-const config = require('./config');
+// file-processor.ts
+import fs from 'fs-extra';
+import path from 'path';
+import pdf from 'pdf-parse';
+import * as xlsx from 'xlsx';
+import cryptoUtils from 'crypto';
+// @ts-ignore
+import GoogleDriveClient from './google-drive-client.ts';
+import iFirmaAPIClass from './ifirma-api.ts';
+// @ts-ignore
+import fileConfig from './config.ts';
+
+interface DriveFile {
+    id: string;
+    name: string;
+    mimeType: string;
+    modifiedTime: string;
+}
+
+interface InvoiceItem {
+    StawkaVat: number;
+    Nazwa: string;
+    Ilosc: number;
+    Cena: number;
+}
+
+interface InvoiceData {
+    identifier: string;
+    issueDate?: string;
+    saleDate?: string;
+    clientName: string;
+    clientNip: string;
+    clientAddress: string;
+    items: InvoiceItem[];
+    source?: string;
+    sourceFileId?: string;
+    sourceFileName?: string;
+    uploadDate?: string;
+}
+
+interface ProcessResult {
+    success: boolean;
+    error?: string;
+    data?: any;
+}
 
 class FileProcessor {
+    private driveClient: any;
+    private api: any;
+    private processedFiles: Set<string>;
+
     constructor() {
         this.driveClient = new GoogleDriveClient();
-        this.api = new iFirmaAPI();
+        this.api = new iFirmaAPIClass();
         this.processedFiles = this.loadProcessedFiles();
     }
 
@@ -19,32 +59,32 @@ class FileProcessor {
         return await this.driveClient.initialize();
     }
 
-    loadProcessedFiles() {
+    loadProcessedFiles(): Set<string> {
         try {
-            if (fs.existsSync(config.processedFiles)) {
-                const data = fs.readFileSync(config.processedFiles, 'utf8');
+            if (fs.existsSync(fileConfig.processedFiles)) {
+                const data = fs.readFileSync(fileConfig.processedFiles, 'utf8');
                 return new Set(JSON.parse(data));
             }
-        } catch (error) {
+        } catch (error: any) {
             console.log('Tworzenie nowego pliku processed_files.json');
         }
         return new Set();
     }
 
-    saveProcessedFiles() {
+    saveProcessedFiles(): void {
         try {
-            fs.writeFileSync(config.processedFiles, JSON.stringify([...this.processedFiles], null, 2));
-        } catch (error) {
+            fs.writeFileSync(fileConfig.processedFiles, JSON.stringify([...this.processedFiles], null, 2));
+        } catch (error: any) {
             console.error('Błąd zapisywania processed_files.json:', error.message);
         }
     }
 
-    async processNewFiles() {
+    async processNewFiles(): Promise<void> {
         try {
             console.log('🔍 Skanowanie Google Drive dla nowych plików...');
 
             const filesData = await this.driveClient.listFiles();
-            const supportedFiles = filesData.files.filter(file =>
+            const supportedFiles = filesData.files.filter((file: DriveFile) =>
               this.driveClient.isSupportedFile(file.mimeType, file.name)
             );
 
@@ -58,12 +98,12 @@ class FileProcessor {
                 }
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ Błąd przetwarzania nowych plików:', error.message);
         }
     }
 
-    async processGoogleDriveFile(file) {
+    async processGoogleDriveFile(file: DriveFile): Promise<void> {
         console.log(`📄 Przetwarzanie: ${file.name} (${file.id})`);
 
         try {
@@ -79,8 +119,8 @@ class FileProcessor {
                 this.saveProcessedFiles();
 
                 // Przenieś do folderu przetworzonych (opcjonalne)
-                if (config.googleDrive.processedFolderId) {
-                    await this.driveClient.moveFile(file.id, config.googleDrive.processedFolderId);
+                if (fileConfig.googleDrive.processedFolderId) {
+                    await this.driveClient.moveFile(file.id, fileConfig.googleDrive.processedFolderId);
                 }
 
                 console.log(`✅ Pomyślnie przetworzono: ${file.name}`);
@@ -89,16 +129,16 @@ class FileProcessor {
             // Usuń tymczasowy plik
             await fs.unlink(tempFilePath);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(`❌ Błąd przetwarzania ${file.name}:`, error.message);
         }
     }
 
-    async processLocalFile(filePath, fileInfo = null) {
+    async processLocalFile(filePath: string, fileInfo: DriveFile | null = null): Promise<ProcessResult> {
         const fileName = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
 
-        let invoiceData;
+        let invoiceData: InvoiceData | null;
 
         // Wyciągnij dane w zależności od typu pliku
         if (ext === '.pdf') {
@@ -141,68 +181,73 @@ class FileProcessor {
         return result;
     }
 
-    isExpenseDocument(fileName, data) {
+    isExpenseDocument(fileName: string, data: InvoiceData): boolean {
         const expenseKeywords = ['wydatek', 'koszty', 'rachunek', 'paragon', 'expense'];
         const fileNameLower = fileName.toLowerCase();
 
         return expenseKeywords.some(keyword => fileNameLower.includes(keyword)) ||
-          (data.identifier && data.identifier.toLowerCase().includes('wy'));
+          (!!data.identifier && data.identifier.toLowerCase().includes('wy'));
     }
 
-    async extractFromPDF(filePath) {
+    async extractFromPDF(filePath: string): Promise<InvoiceData | null> {
         try {
             const dataBuffer = fs.readFileSync(filePath);
             const pdfData = await pdf(dataBuffer);
             const text = pdfData.text;
 
             return this.parseInvoiceText(text);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Błąd przy czytaniu PDF:', error.message);
             return null;
         }
     }
 
-    extractFromExcel(filePath) {
+    extractFromExcel(filePath: string): InvoiceData | null {
         try {
             const workbook = xlsx.readFile(filePath);
             const sheetName = workbook.SheetNames[0];
+            if (!sheetName) {
+                throw new Error('No worksheets found in Excel file');
+            }
             const worksheet = workbook.Sheets[sheetName];
-            const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+            if (!worksheet) {
+                throw new Error('Unable to access worksheet');
+            }
+            const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
             // Przykładowa struktura - dostosuj do swoich plików
-            const invoiceData = {
+            const invoiceData: InvoiceData = {
                 identifier: data[1]?.[0] || '',
                 issueDate: this.formatDate(data[1]?.[1]),
                 saleDate: this.formatDate(data[1]?.[2]),
                 clientName: data[1]?.[3] || '',
                 clientNip: data[1]?.[4] || '',
                 clientAddress: data[1]?.[5] || '',
-                paymentMethod: data[1]?.[6] || 'Przelew',
-                paymentDeadline: this.formatDate(data[1]?.[7]),
                 items: []
             };
 
             // Pozycje faktury (od wiersza 4)
             for (let i = 3; i < data.length; i++) {
-                if (data[i] && data[i][0]) {
+                const row = data[i];
+                if (row && row[0]) {
                     invoiceData.items.push({
-                        StawkaVat: parseFloat(data[i][0]) || 23,
-                        Nazwa: data[i][1] || '',
-                        Ilosc: parseFloat(data[i][2]) || 1,
-                        Cena: parseFloat(data[i][3]) || 0
+                        StawkaVat: parseFloat(row[0]) || 23,
+                        Nazwa: row[1] || '',
+                        Ilosc: parseFloat(row[2]) || 1,
+                        Cena: parseFloat(row[3]) || 0
                     });
                 }
             }
 
             return invoiceData;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Błąd przy czytaniu Excel:', error.message);
             return null;
         }
     }
 
-    parseInvoiceText(text) {
-        const invoiceData = {
+    parseInvoiceText(text: string): InvoiceData {
+        const invoiceData: InvoiceData = {
             identifier: '',
             issueDate: new Date().toISOString().split('T')[0],
             saleDate: new Date().toISOString().split('T')[0],
@@ -215,52 +260,52 @@ class FileProcessor {
         try {
             // Parsowanie podobne jak wcześniej
             const invoiceNumberMatch = text.match(/(?:Faktura|Invoice)\s*(?:nr|number|#):?\s*([^\s\n]+)/i);
-            if (invoiceNumberMatch) {
+            if (invoiceNumberMatch && invoiceNumberMatch[1]) {
                 invoiceData.identifier = invoiceNumberMatch[1];
             }
 
-            const issueDateMatch = text.match(/Data\s*wystawienia:?\s*(\d{4}-\d{2}-\d{2}|\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);
-            if (issueDateMatch) {
+            const issueDateMatch = text.match(/Data\s*wystawienia:?\s*(\d{4}-\d{2}-\d{2}|\d{2}[./]\d{2}[./]\d{4})/i);
+            if (issueDateMatch && issueDateMatch[1]) {
                 invoiceData.issueDate = this.formatDate(issueDateMatch[1]);
             }
 
-            const saleDateMatch = text.match(/Data\s*sprzedaży:?\s*(\d{4}-\d{2}-\d{2}|\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);
-            if (saleDateMatch) {
+            const saleDateMatch = text.match(/Data\s*sprzedaży:?\s*(\d{4}-\d{2}-\d{2}|\d{2}[./]\d{2}[./]\d{4})/i);
+            if (saleDateMatch && saleDateMatch[1]) {
                 invoiceData.saleDate = this.formatDate(saleDateMatch[1]);
             }
 
             const clientNameMatch = text.match(/(?:Nabywca|Customer|Client):?\s*\n([^\n]+)/i);
-            if (clientNameMatch) {
+            if (clientNameMatch && clientNameMatch[1]) {
                 invoiceData.clientName = clientNameMatch[1].trim();
             }
 
             const nipMatch = text.match(/(?:NIP|TAX\s*ID):?\s*(\d{10})/i);
-            if (nipMatch) {
+            if (nipMatch && nipMatch[1]) {
                 invoiceData.clientNip = nipMatch[1];
             }
 
             // Parsowanie pozycji - dostosuj do formatu swoich faktur
             this.parseInvoiceItems(text, invoiceData);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Błąd parsowania tekstu faktury:', error.message);
         }
 
         return invoiceData;
     }
 
-    parseInvoiceItems(text, invoiceData) {
+    parseInvoiceItems(text: string, invoiceData: InvoiceData): void {
         // Szukaj sekcji z pozycjami
         const itemsSectionMatch = text.match(/(?:Nazwa|Description|Item).*?(?:Wartość|Total|Amount).*?\n([\s\S]*?)(?:Razem|Total|Sum|Podsumowanie|$)/i);
 
-        if (itemsSectionMatch) {
+        if (itemsSectionMatch && itemsSectionMatch[1]) {
             const itemsText = itemsSectionMatch[1];
             const lines = itemsText.split('\n').filter(line => line.trim());
 
-            lines.forEach(line => {
+            lines.forEach((line: string) => {
                 // Dopasuj wzorzec: nazwa | ilość | cena | vat
                 const itemMatch = line.match(/(.+?)\s+(\d+(?:,\d+)?)\s+(\d+(?:,\d+)?)\s+(\d+(?:,\d+)?)/);
-                if (itemMatch) {
+                if (itemMatch && itemMatch[1] && itemMatch[2] && itemMatch[3] && itemMatch[4]) {
                     invoiceData.items.push({
                         Nazwa: itemMatch[1].trim(),
                         Ilosc: parseFloat(itemMatch[2].replace(',', '.')),
@@ -282,7 +327,7 @@ class FileProcessor {
         }
     }
 
-    formatDate(dateStr) {
+    formatDate(dateStr: any): string {
         if (!dateStr) return '';
 
         try {
@@ -290,22 +335,23 @@ class FileProcessor {
             if (dateStr.includes('-')) {
                 date = new Date(dateStr);
             } else if (dateStr.includes('.') || dateStr.includes('/')) {
-                const parts = dateStr.split(/[\.\/]/);
+                const parts = dateStr.split(/[./]/);
                 date = new Date(parts[2], parts[1] - 1, parts[0]);
             } else {
                 return dateStr;
             }
 
-            return date.toISOString().split('T')[0];
-        } catch (error) {
+            const isoString = date.toISOString().split('T')[0];
+            return isoString || '';
+        } catch (error: any) {
             console.error('Błąd formatowania daty:', error.message);
             return '';
         }
     }
 
-    sleep(ms) {
+    sleep(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
-module.exports = FileProcessor;
+export default FileProcessor;

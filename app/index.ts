@@ -1,9 +1,14 @@
-// index.js
-const app = require('./webhook-server');
-const FileProcessor = require('./file-processor');
-const config = require('./config');
+// index.ts
+// @ts-ignore
+import app from './webhook-server';
+import FileProcessor from './file-processor';
+// @ts-ignore
+import appConfig from './config';
 
 class GDriveiFirmaWorkflow {
+    public processor: any;
+    private server: any;
+
     constructor() {
         this.processor = new FileProcessor();
         this.server = null;
@@ -20,15 +25,15 @@ class GDriveiFirmaWorkflow {
         }
 
         // Start webhook server
-        this.server = app.listen(config.server.port, () => {
-            console.log(`🌐 Webhook server listening on port ${config.server.port}`);
+        this.server = app.listen(appConfig.server.port, () => {
+            console.log(`🌐 Webhook server listening on port ${appConfig.server.port}`);
         });
 
         // Setup Google Drive webhook
         try {
             await this.processor.driveClient.setupWebhook();
             console.log('✅ Google Drive webhook configured');
-        } catch (error) {
+        } catch (error: any) {
             console.warn('⚠️ Could not setup webhook, falling back to polling mode');
             this.startPolling();
         }
@@ -46,7 +51,7 @@ class GDriveiFirmaWorkflow {
             try {
                 console.log('🔄 Polling for new files...');
                 await this.processor.processNewFiles();
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Polling error:', error.message);
             }
         }, 5 * 60 * 1000); // 5 minutes
@@ -72,7 +77,7 @@ process.on('SIGTERM', async () => {
 });
 
 // Start application
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
     const workflow = new GDriveiFirmaWorkflow();
 
     if (process.argv.includes('--manual')) {
@@ -83,17 +88,17 @@ if (require.main === module) {
             console.log('✅ Manual processing completed');
             process.exit(0);
         })
-        .catch(error => {
+        .catch((error: any) => {
             console.error('❌ Error:', error.message);
             process.exit(1);
         });
     } else {
         // Daemon mode
-        workflow.start().catch(error => {
+        workflow.start().catch((error: any) => {
             console.error('❌ Startup error:', error.message);
             process.exit(1);
         });
     }
 }
 
-module.exports = GDriveiFirmaWorkflow;
+export default GDriveiFirmaWorkflow;

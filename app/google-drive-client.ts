@@ -1,10 +1,14 @@
 // google-drive-client.js
-const { google } = require('googleapis');
-const fs = require('fs-extra');
-const path = require('path');
-const config = require('./config');
+import { google } from 'googleapis';
+import { drive_v3 } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
+import fs from 'fs-extra';
+import path from 'path';
+import config from './config.ts';
 
 class GoogleDriveClient {
+    private auth: GoogleAuth;
+    private drive: drive_v3.Drive;
     constructor() {
         this.auth = new google.auth.GoogleAuth({
             keyFile: config.googleDrive.keyFile,
@@ -21,7 +25,7 @@ class GoogleDriveClient {
             console.log('✅ Google Drive API authenticated successfully');
             return true;
         } catch (error) {
-            console.error('❌ Google Drive authentication failed:', error.message);
+            console.error('❌ Google Drive authentication failed:', (error as Error).message);
             return false;
         }
     }
@@ -30,25 +34,25 @@ class GoogleDriveClient {
         try {
             // Setup push notification for folder changes
             const response = await this.drive.files.watch({
-                fileId: config.googleDrive.folderId,
+                fileId: config.googleDrive.folderId || '',
                 requestBody: {
                     id: `ifirma-webhook-${Date.now()}`,
                     type: 'web_hook',
                     address: config.webhook.url,
                     token: config.webhook.secret,
-                    expiration: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+                    expiration: (Date.now() + (7 * 24 * 60 * 60 * 1000)).toString() // 7 days
                 }
             });
 
             console.log('🔔 Google Drive webhook configured:', response.data);
             return response.data;
         } catch (error) {
-            console.error('❌ Webhook setup failed:', error.message);
+            console.error('❌ Webhook setup failed:', (error as Error).message);
             throw error;
         }
     }
 
-    async listFiles(folderId = null, pageToken = null) {
+    async listFiles(folderId: string | null = null, pageToken: string | null = null) {
         try {
             const params = {
                 q: `'${folderId || config.googleDrive.folderId}' in parents and trashed=false`,
@@ -57,18 +61,18 @@ class GoogleDriveClient {
             };
 
             if (pageToken) {
-                params.pageToken = pageToken;
+                (params as any).pageToken = pageToken;
             }
 
             const response = await this.drive.files.list(params);
             return response.data;
         } catch (error) {
-            console.error('❌ Error listing files:', error.message);
+            console.error('❌ Error listing files:', (error as Error).message);
             throw error;
         }
     }
 
-    async downloadFile(fileId, fileName) {
+    async downloadFile(fileId: string, fileName: string) {
         try {
             const tempPath = path.join('./temp', `${Date.now()}_${fileName}`);
             await fs.ensureDir('./temp');
@@ -86,12 +90,12 @@ class GoogleDriveClient {
                 writer.on('error', reject);
             });
         } catch (error) {
-            console.error(`❌ Error downloading file ${fileName}:`, error.message);
+            console.error(`❌ Error downloading file ${fileName}:`, (error as Error).message);
             throw error;
         }
     }
 
-    async moveFile(fileId, newFolderId) {
+    async moveFile(fileId: string, newFolderId: string) {
         try {
             // Get current parents
             const file = await this.drive.files.get({
@@ -99,7 +103,7 @@ class GoogleDriveClient {
                 fields: 'parents'
             });
 
-            const previousParents = file.data.parents.join(',');
+            const previousParents = file.data.parents?.join(',') || '';
 
             // Move to new folder
             await this.drive.files.update({
@@ -110,12 +114,12 @@ class GoogleDriveClient {
 
             console.log(`📁 File ${fileId} moved to processed folder`);
         } catch (error) {
-            console.error('❌ Error moving file:', error.message);
+            console.error('❌ Error moving file:', (error as Error).message);
             throw error;
         }
     }
 
-    async createFolder(name, parentId = null) {
+    async createFolder(name: string, parentId: string | null = null) {
         try {
             const response = await this.drive.files.create({
                 requestBody: {
@@ -127,12 +131,12 @@ class GoogleDriveClient {
 
             return response.data.id;
         } catch (error) {
-            console.error(`❌ Error creating folder ${name}:`, error.message);
+            console.error(`❌ Error creating folder ${name}:`, (error as Error).message);
             throw error;
         }
     }
 
-    async searchFiles(query, folderId = null) {
+    async searchFiles(query: string, folderId: string | null = null) {
         try {
             let searchQuery = query;
             if (folderId) {
@@ -146,12 +150,12 @@ class GoogleDriveClient {
 
             return response.data.files;
         } catch (error) {
-            console.error('❌ Error searching files:', error.message);
+            console.error('❌ Error searching files:', (error as Error).message);
             throw error;
         }
     }
 
-    isSupportedFile(mimeType, fileName) {
+    isSupportedFile(mimeType: string, fileName: string) {
         const supportedTypes = [
             'application/pdf',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
@@ -165,4 +169,4 @@ class GoogleDriveClient {
     }
 }
 
-module.exports = GoogleDriveClient;
+export default GoogleDriveClient;

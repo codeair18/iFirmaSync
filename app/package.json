@@ -4,6 +4,12 @@
   "description": "",
   "main": "config.js",
   "scripts": {
+    "build": "tsc",
+    "workflow:do": "ts-node index.ts",
+    "clean": "rm -rf dist",
+    "build:watch": "tsc --watch",
+    "serve": "node dist/webhook-server.js",
+    "start": "ts-node webhook-server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -13,7 +19,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/codeair18/iFirmaSync/issues"
   },
@@ -30,5 +36,15 @@
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/express": "^5.0.3",
+    "@types/fs-extra": "^11.0.4",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.5.2",
+    "@types/pdf-parse": "^1.1.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
   }
 }
