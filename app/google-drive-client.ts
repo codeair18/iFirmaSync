@@ -8,7 +8,7 @@ import config from './config';
 
 class GoogleDriveClient {
     private auth: GoogleAuth;
-    private drive: drive_v3.Drive;
+    public drive: drive_v3.Drive;
     constructor() {
         this.auth = new google.auth.GoogleAuth({
             keyFile: config.googleDrive.keyFile,
@@ -54,17 +54,25 @@ class GoogleDriveClient {
 
     async listFiles(folderId: string | null = null, pageToken: string | null = null) {
         try {
+            const targetFolderId = folderId || config.googleDrive.folderId;
+            const query = `'${targetFolderId}' in parents and trashed=false`;
+
             const params = {
-                q: `'${folderId || config.googleDrive.folderId}' in parents and trashed=false`,
+                q: query,
                 fields: 'nextPageToken, files(id, name, mimeType, modifiedTime, size, parents)',
-                pageSize: 100
+                pageSize: 100,
+                includeItemsFromAllDrives: true,
+                supportsAllDrives: true
             };
 
             if (pageToken) {
                 (params as any).pageToken = pageToken;
             }
 
+            console.log(`🔍 Listing files with query: ${query}`);
             const response = await this.drive.files.list(params);
+            console.log(`📁 Found ${response.data.files?.length || 0} items in folder ${targetFolderId}`);
+
             return response.data;
         } catch (error) {
             console.error('❌ Error listing files:', (error as Error).message);

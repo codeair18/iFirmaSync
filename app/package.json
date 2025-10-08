@@ -5,11 +5,11 @@
   "main": "config.js",
   "scripts": {
     "build": "tsc",
-    "workflow:do": "ts-node index.ts",
     "clean": "rm -rf dist",
     "build:watch": "tsc --watch",
     "serve": "node dist/webhook-server.js",
     "start": "tsx webhook-server.ts",
+    "source:watch": "tsx watch-drive-folder.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
