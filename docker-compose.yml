@@ -10,3 +10,19 @@ services:
     environment:
       - NODE_ENV=development
     restart: unless-stopped
+    networks:
+      - internal_network
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: ["http", "app:3000"]
+    ports:
+      - "4040:4040"
+    depends_on:
+      - app
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    networks:
+      - internal_network
+networks:
+  internal_network:
+    driver: bridge

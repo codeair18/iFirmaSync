@@ -1,5 +1,6 @@
 app/node_modules
 app/.env
 app/data/*
+.env
 
 app/package-lock.json
