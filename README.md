@@ -21,6 +21,7 @@ iFirmaSync to aplikacja Node.js, która monitoruje folder Google Drive w poszuki
 - Projekt Google Cloud z włączonym API Google Drive
 - Poświadczenia konta usługi (service account) dla Google Drive
 - Konto iFirma.pl z dostępem do API
+- Token ngrok (dla webhooków Google Drive)
 
 ## Instalacja
 
@@ -49,7 +50,16 @@ Umieść poświadczenia konta usługi Google w:
 app/service-account-key.json
 ```
 
-### 4. Zbuduj i uruchom
+### 4. Konfiguracja ngrok
+
+Utwórz plik `.env` w głównym katalogu projektu z tokenem ngrok:
+```env
+NGROK_AUTHTOKEN=twoj_token_ngrok
+```
+
+Token możesz uzyskać po rejestracji na [ngrok.com](https://ngrok.com).
+
+### 5. Zbuduj i uruchom
 
 ```bash
 docker-compose up -d
@@ -87,6 +97,19 @@ bin/node app/tests/test-ifirma.js
 ```
 
 Te skrypty wykonują polecenia wewnątrz kontenera Docker dla spójności.
+
+### Panel monitorowania ngrok
+
+Po uruchomieniu aplikacji dostępny jest panel ngrok do weryfikacji tunelu:
+- **URL**: http://localhost:4040
+- **Funkcje**:
+  - Podgląd publicznego URL tunelu
+  - Status połączenia
+  - Live monitoring requestów HTTP
+  - Historia połączeń
+  - Szczegóły zapytań i odpowiedzi
+
+Panel pozwala na debugowanie webhooków Google Drive i weryfikację komunikacji z zewnętrznymi serwisami.
 
 ## Architektura
 
@@ -135,9 +158,14 @@ Używa uwierzytelniania konta usługi z API Google Drive v3 do:
 
 ### Środowisko Docker
 
-- Kontener: Node.js LTS Alpine
-- Port deweloperski: 3000
-- Kod źródłowy zamontowany w: `/usr/src/app`
+- **Kontener aplikacji**: Node.js LTS Alpine
+- **Port deweloperski**: 3000
+- **Kod źródłowy zamontowany w**: `/usr/src/app`
+- **Kontener ngrok**:
+  - Tworzy publiczny tunel do lokalnej aplikacji
+  - Port panelu monitorowania: 4040
+  - Umożliwia odbieranie webhooków Google Drive
+  - Automatycznie łączy się z kontenerem aplikacji przez sieć Docker
 
 ### Główne zależności
 
@@ -162,6 +190,13 @@ url + username + keyName + requestContent
 
 Sprawdź, czy konto usługi ma przyznany dostęp do monitorowanego folderu Google Drive.
 
+### Problemy z ngrok
+
+Jeśli ngrok nie działa poprawnie:
+1. Sprawdź, czy token `NGROK_AUTHTOKEN` jest ustawiony w pliku `.env` w głównym katalogu projektu
+2. Zweryfikuj token na http://localhost:4040 - powinien pokazać aktywny tunel
+3. Sprawdź logi kontenera: `docker-compose logs ngrok`
+4. Upewnij się, że token jest prawidłowy na [ngrok.com](https://ngrok.com)
 
 ## Współpraca
 
