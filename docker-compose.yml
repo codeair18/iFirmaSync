@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -12,17 +10,23 @@ services:
     restart: unless-stopped
     networks:
       - internal_network
-  ngrok:
-    image: ngrok/ngrok:latest
-    command: ["http", "app:3000"]
-    ports:
-      - "4040:4040"
+
+  tunnel:
+    build:
+      context: ./docker/tunnel
+      dockerfile: Dockerfile
+    environment:
+      - TARGET_HOST=app
+      - TARGET_PORT=3000
+      - TUNNEL_SUBDOMAIN=${TUNNEL_SUBDOMAIN:-random}
+    restart: unless-stopped
     depends_on:
       - app
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     networks:
       - internal_network
+    env_file:
+      - ./app/.env
+
 networks:
   internal_network:
     driver: bridge
