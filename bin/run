@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Run node commands inside the container
+docker compose up --force-recreate --build

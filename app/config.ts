@@ -17,7 +17,7 @@ const config = {
     },
     webhook: {
         url: process.env.WEBHOOK_URL || 'https://your-domain.com/webhook',
-        secret: process.env.WEBHOOK_SECRET || 'your-secret-key'
+        secret: process.env.WEBHOOK_SECRET || 'not-set-webhook-secret-key-'+Math.random().toString(36).substring(2, 15)
     },
     server: {
         port: process.env.PORT || 3000
